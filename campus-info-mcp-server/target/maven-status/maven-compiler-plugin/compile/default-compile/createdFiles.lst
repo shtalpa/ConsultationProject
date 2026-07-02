@@ -1,0 +1,8 @@
+com\campus\mcp\server\tools\CampusTools.class
+com\campus\mcp\server\resources\CampusResources.class
+com\campus\mcp\server\CampusMcpServer.class
+com\campus\mcp\server\kb\KnowledgeBase.class
+com\campus\mcp\server\kb\DataStore.class
+com\campus\mcp\server\kb\KnowledgeBase$Chunk.class
+com\campus\mcp\server\kb\KnowledgeBase$Hit.class
+com\campus\mcp\server\prompts\CampusPrompts.class

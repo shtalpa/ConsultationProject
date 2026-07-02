@@ -1,0 +1,24 @@
+:= CAMPUS FACILITIES &amp; OPENING HOURS =:
+
+[Buildings]
+- BLOCK D (D): Discussion rooms D9A.01 to D9A.03, D9B.01 to D9B.03
+- BLOCK D (LAB): Computer labs C7.01 to C7.14, open 08:00-22:00.
+- BLOCK E (E): Discussion rooms E9A.01 to E9A.03, E9B.01 to E9B.03, group study rooms E7.01 to E7.07.
+- BLOCK C (LIB): Library, Quiet study pods KA-P1 to KA-P20.
+- OUTDOOR (OUT): Basketball courts SP-B1 to SP-B2.
+
+[Bookable Resources]
+ROOM    | TYPE             | CAPACITY | BUILDING | OPEN  | CLOSE
+D9A.01  | discussion_room  | 6        | D        | 08:00 | 21:00
+D9B.01  | discussion_room  | 8        | D        | 08:00 | 21:00
+E9A.03  | discussion_room  | 4        | E        | 08:00 | 21:00
+E7.01   | group_study_room | 6        | E        | 09:00 | 20:00
+E7.02   | group_study_room | 6        | E        | 09:00 | 20:00
+C7.01   | computer_lab     | 30       | LAB      | 08:00 | 22:00
+KA-P1   | study_pod        | 2        | LIB      | 07:00 | 23:00
+KA-P2   | study_pod        | 1        | LIB      | 07:00 | 23:00
+SP-B1   | Basketball court | 40       | OUT      | 07:00 | 22:00
+
+[Notes]
+Opening hours may be reduced during examination periods and public holidays.
+Sports facilities require booking in 1-hour blocks.

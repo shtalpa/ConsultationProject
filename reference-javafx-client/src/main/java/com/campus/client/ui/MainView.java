@@ -1,0 +1,314 @@
+package com.campus.client.ui;
+
+import com.campus.client.mcp.CampusMcpClient;
+import com.campus.client.rag.RagService;
+import javafx.application.Platform;
+import javafx.geometry.Insets;
+import javafx.geometry.Pos;
+import javafx.scene.control.*;
+import javafx.scene.layout.*;
+import javafx.scene.text.Font;
+import javafx.scene.text.FontWeight;
+
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.stream.Collectors;
+
+/**
+ * A professional conversational user interface structured for the Student Workspace role.
+ * Organizes operations into a horizontal top tab layout to isolate distinct tasks,
+ * launching with the System Capabilities view by default.
+ */
+public final class MainView {
+
+    private final BorderPane root = new BorderPane();
+    private final Label status = new Label("System Status: Ready");
+
+    // Top Navigation Tabs
+    private final Button navDiscoveryButton = new Button("System Capabilities");
+    private final Button navChatButton = new Button("AI Assistant");
+
+    private VBox chatPageView;
+    private VBox discoveryPageView;
+
+    // RAG Chat Panel Layout Elements
+    private final ScrollPane chatScrollPane = new ScrollPane();
+    private final VBox chatTimeline = new VBox(12);
+    private final TextField questionField = new TextField();
+    private final Button askButton = new Button("Send ➔");
+
+    private final TextArea discoveryArea = new TextArea();
+
+    private final ExecutorService worker = Executors.newSingleThreadExecutor(r -> {
+        Thread t = new Thread(r, "ui-worker");
+        t.setDaemon(true);
+        return t;
+    });
+
+    private CampusMcpClient mcp;
+    private RagService rag;
+
+    // Styling Design Constants
+    private static final String FONT_FAMILY = "Segoe UI";
+    private static final String FONT_MONO = "Consolas";
+    private static final String BRAND_PRIMARY = "#2B6CB0";
+    private static final String CHAT_BG_USER = "#EBF8FF";
+    private static final String CHAT_BG_AI = "#F7FAFC";
+
+    public MainView() {
+        // --- 1. TOP HEADER PANEL (BRANDING + TABS) ---
+        VBox topContainer = new VBox(0);
+
+        // Branding Banner
+        HBox headerBanner = new HBox(8);
+        headerBanner.setPadding(new Insets(16, 24, 12, 24));
+        headerBanner.setAlignment(Pos.CENTER_LEFT);
+        headerBanner.setStyle("-fx-background-color: #1A202C;");
+
+        Label heading = new Label("Campus Workspace Client");
+        heading.setTextFill(javafx.scene.paint.Color.WHITE);
+        heading.setFont(Font.font(FONT_FAMILY, FontWeight.BOLD, 18));
+
+        Label subHeading = new Label(" • Student Persona Node");
+        subHeading.setTextFill(javafx.scene.paint.Color.web("#A0AEC0"));
+        subHeading.setFont(Font.font(FONT_FAMILY, FontWeight.NORMAL, 12));
+        headerBanner.getChildren().addAll(heading, subHeading);
+
+        // Horizontal Top Navigation Tabs Bar
+        HBox topTabBar = new HBox(4);
+        topTabBar.setPadding(new Insets(0, 24, 0, 24));
+        topTabBar.setAlignment(Pos.BOTTOM_LEFT);
+        topTabBar.setStyle("-fx-background-color: #1A202C;");
+
+        styleTabButton(navDiscoveryButton);
+        styleTabButton(navChatButton);
+        topTabBar.getChildren().addAll(navDiscoveryButton, navChatButton);
+
+        topContainer.getChildren().addAll(headerBanner, topTabBar);
+        root.setTop(topContainer);
+
+        // --- 2. PAGE VIEW VIEWS STACK INITIALIZATION ---
+        initDiscoveryPage();
+        initChatPage();
+
+        // Central Display Stack Panel
+        StackPane contentStack = new StackPane();
+        contentStack.getChildren().addAll(discoveryPageView, chatPageView);
+        root.setCenter(contentStack);
+
+        // Displays capabilities view first by default
+        showPage(discoveryPageView, navDiscoveryButton);
+
+        // --- 3. PERSISTENT SYSTEM STATUS FOOTER ---
+        HBox footerBar = new HBox();
+        footerBar.setPadding(new Insets(8, 20, 8, 20));
+        footerBar.setAlignment(Pos.CENTER_LEFT);
+        footerBar.setStyle("-fx-background-color: #EDF2F7; -fx-border-color: #CBD5E0; -fx-border-width: 1 0 0 0;");
+
+        status.setFont(Font.font(FONT_FAMILY, FontWeight.MEDIUM, 12));
+        status.setTextFill(javafx.scene.paint.Color.web("#4A5568"));
+        status.setWrapText(true);
+        footerBar.getChildren().add(status);
+        root.setBottom(footerBar);
+
+        setEnabled(false);
+        wire();
+    }
+
+    public BorderPane getRoot() {
+        return root;
+    }
+
+    public void bind(CampusMcpClient mcp, RagService rag) {
+        this.mcp = mcp;
+        this.rag = rag;
+        setEnabled(true);
+        if (rag == null) {
+            askButton.setDisable(true);
+        }
+    }
+
+    public void setStatus(String text) {
+        Platform.runLater(() -> status.setText("System Status: " + text));
+    }
+
+    public void refreshDiscovery() {
+        if (mcp == null) return;
+        worker.submit(() -> {
+            try {
+                String tools = mcp.listTools().stream()
+                        .map(t -> "  • " + t.name() + " \n    ↳ " + t.description())
+                        .collect(Collectors.joining("\n\n"));
+                String resources = mcp.listResources().stream()
+                        .map(r -> "  • " + r.uri() + " (" + r.name() + ")")
+                        .collect(Collectors.joining("\n"));
+                String prompts = mcp.listPrompts().stream()
+                        .map(p -> "  • " + p.name() + " \n    ↳ " + p.description())
+                        .collect(Collectors.joining("\n\n"));
+                String text = "=== REGISTERED CAPABILITY TOOLS ===\n" + tools +
+                        "\n\n=== EXPOSED CAMPUS FILE RESOURCES ===\n" + resources +
+                        "\n\n=== PRE-CONFIGURED FRAME PROMPTS ===\n" + prompts;
+                Platform.runLater(() -> discoveryArea.setText(text));
+            } catch (Exception e) {
+                Platform.runLater(() -> discoveryArea.setText("Discovery context initialization fail: " + e.getMessage()));
+            }
+        });
+    }
+
+    // ---- Page Construction Initializations ----------------------------------------------
+
+    private void initDiscoveryPage() {
+        styleOutputTextArea(discoveryArea);
+        VBox.setVgrow(discoveryArea, Priority.ALWAYS);
+
+        discoveryPageView = new VBox(12,
+                createSectionHeaderLabel("Advertised Server Schema Structure"),
+                discoveryArea);
+        discoveryPageView.setPadding(new Insets(24));
+        discoveryPageView.setStyle("-fx-background-color: #FFFFFF;");
+    }
+
+    private void initChatPage() {
+        chatTimeline.setPadding(new Insets(8));
+        chatTimeline.setStyle("-fx-background-color: #FFFFFF;");
+
+        chatScrollPane.setContent(chatTimeline);
+        chatScrollPane.setFitToWidth(true);
+        chatScrollPane.setStyle("-fx-background: #FFFFFF; -fx-border-color: #E2E8F0; -fx-border-radius: 4px;");
+        VBox.setVgrow(chatScrollPane, Priority.ALWAYS);
+
+        styleInputField(questionField, "Ask about rules, or browse availability (e.g., 'When is Dr Steve free?')");
+        styleActionButton(askButton, BRAND_PRIMARY);
+
+        HBox inputDock = new HBox(8);
+        inputDock.setAlignment(Pos.CENTER_LEFT);
+        inputDock.setPadding(new Insets(8, 0, 0, 0));
+        HBox.setHgrow(questionField, Priority.ALWAYS);
+        inputDock.getChildren().addAll(questionField, askButton);
+
+        appendMessageBubble("Hello Student! I am your Taylor's University Workspace assistant. You can ask me campus policy questions or query open slots directly.", false);
+
+        chatPageView = new VBox(8,
+                createSectionHeaderLabel("Grounded Student Virtual Assistant (RAG Chat)"),
+                chatScrollPane,
+                inputDock);
+        chatPageView.setPadding(new Insets(24));
+        chatPageView.setStyle("-fx-background-color: #FFFFFF;");
+    }
+
+    private void showPage(VBox activePage, Button activeNavButton) {
+        discoveryPageView.setVisible(false);
+        chatPageView.setVisible(false);
+
+        activePage.setVisible(true);
+
+        String inactiveStyle = "-fx-background-color: #2D3748; -fx-text-fill: #A0AEC0; -fx-background-radius: 4px 4px 0px 0px;";
+        navDiscoveryButton.setStyle(inactiveStyle);
+        navChatButton.setStyle(inactiveStyle);
+
+        activeNavButton.setStyle("-fx-background-color: #FFFFFF; -fx-text-fill: " + BRAND_PRIMARY + "; -fx-background-radius: 4px 4px 0px 0px;");
+    }
+
+    // ---- Style Component Factories ------------------------------------------------------
+
+    private void styleTabButton(Button btn) {
+        btn.setFont(Font.font(FONT_FAMILY, FontWeight.BOLD, 13));
+        btn.setPadding(new Insets(10, 20, 10, 20));
+        btn.setCursor(javafx.scene.Cursor.HAND);
+    }
+
+    private Label createSectionHeaderLabel(String text) {
+        Label lbl = new Label(text.toUpperCase());
+        lbl.setFont(Font.font(FONT_FAMILY, FontWeight.BOLD, 12));
+        lbl.setTextFill(javafx.scene.paint.Color.web(BRAND_PRIMARY));
+        return lbl;
+    }
+
+    private void styleInputField(TextField field, String placeholder) {
+        field.setPromptText(placeholder);
+        field.setFont(Font.font(FONT_FAMILY, 13));
+        field.setPadding(new Insets(10));
+        field.setPrefWidth(320);
+        field.setStyle("-fx-background-color: #F8FAFC; -fx-border-color: #CBD5E0; -fx-border-radius: 4px; -fx-background-radius: 4px;");
+    }
+
+    private void styleOutputTextArea(TextArea area) {
+        area.setEditable(false);
+        area.setWrapText(true);
+        area.setFont(Font.font(FONT_MONO, 12));
+        area.setStyle("-fx-control-inner-background: #F7FAFC; -fx-text-fill: #1A202C; -fx-border-color: #E2E8F0;");
+    }
+
+    private void styleActionButton(Button btn, String baseHexColor) {
+        btn.setFont(Font.font(FONT_FAMILY, FontWeight.BOLD, 13));
+        btn.setTextFill(javafx.scene.paint.Color.WHITE);
+        btn.setPadding(new Insets(12, 24, 12, 24));
+        btn.setCursor(javafx.scene.Cursor.HAND);
+        btn.setStyle("-fx-background-color: " + baseHexColor + "; -fx-background-radius: 6px;");
+    }
+
+    private void appendMessageBubble(String text, boolean isUser) {
+        Platform.runLater(() -> {
+            Label label = new Label(text);
+            label.setWrapText(true);
+            label.setFont(Font.font(FONT_FAMILY, 13));
+            label.setMaxWidth(520);
+            label.setPadding(new Insets(10, 14, 10, 14));
+
+            HBox bubbleWrapper = new HBox();
+            if (isUser) {
+                bubbleWrapper.setAlignment(Pos.CENTER_RIGHT);
+                label.setStyle("-fx-background-color: " + CHAT_BG_USER + "; -fx-text-fill: #2B6CB0; -fx-background-radius: 16px 16px 2px 16px;");
+            } else {
+                bubbleWrapper.setAlignment(Pos.CENTER_LEFT);
+                label.setStyle("-fx-background-color: " + CHAT_BG_AI + "; -fx-text-fill: #2D3748; -fx-border-color: #E2E8F0; -fx-border-radius: 16px 16px 16px 2px; -fx-background-radius: 16px 16px 16px 2px;");
+            }
+
+            bubbleWrapper.getChildren().add(label);
+            chatTimeline.getChildren().add(bubbleWrapper);
+            chatScrollPane.setVvalue(1.0);
+        });
+    }
+
+    // ---- Functional Event Mapping Actions ------------------------------------------------
+
+    private void wire() {
+        navDiscoveryButton.setOnAction(_ -> showPage(discoveryPageView, navDiscoveryButton));
+        navChatButton.setOnAction(_ -> showPage(chatPageView, navChatButton));
+
+        questionField.setOnAction(_ -> askButton.fire());
+
+        askButton.setOnAction(_ -> {
+            String q = questionField.getText().trim();
+            if (q.isEmpty() || rag == null) return;
+
+            appendMessageBubble(q, true);
+            questionField.clear();
+
+            setEnabled(false);
+            setStatus("Query payload parsing inside structural fallback thread pool...");
+
+            worker.submit(() -> {
+                try {
+                    RagService.RagResult r = rag.ask(q);
+                    appendMessageBubble(r.answer(), false);
+                    Platform.runLater(() -> {
+                        setEnabled(true);
+                        setStatus("Ready");
+                    });
+                } catch (Exception ex) {
+                    Platform.runLater(() -> {
+                        appendMessageBubble("RAG Engine Error: An error occurred processing your request.", false);
+                        setEnabled(true);
+                        setStatus("Ready");
+                    });
+                }
+            });
+        });
+    }
+
+    private void setEnabled(boolean enabled) {
+        askButton.setDisable(!enabled || rag == null);
+        questionField.setDisable(!enabled || rag == null);
+    }
+}

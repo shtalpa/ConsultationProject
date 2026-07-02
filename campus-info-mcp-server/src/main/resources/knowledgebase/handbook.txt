@@ -1,0 +1,34 @@
+:= CAMPUS STUDENT HANDBOOK (excerpt) =:
+
+[General]
+Taylor'sUniversity campus is open to students from 07:00 to 23:00 on weekdays
+and 08:00 to 18:00 on weekends. A valid student ID card is required to enter all
+buildings after 19:00.
+
+[Resource Booking]
+Students may book bookable resources such as discussion rooms, study pods, lab
+workstations and sports facilities through the Campus Services system. Bookings open
+14 days in advance. Each student may hold at most 3 active bookings at a time. A
+booking that is not checked in within 15 minutes of its start time is released
+automatically. Discussion rooms seat 4 to 8 people; study pods seat 1 to 2 people.
+
+[Appointments with Lecturers]
+Every lecturer publishes weekly consultation hours. Students request an appointment
+for a specific published slot and receive a confirmation reference. Appointments are
+20 minutes by default. Students should arrive 5 minutes early and bring relevant
+materials. Cancellations must be made at least 2 hours in advance.
+
+[Leave Application]
+Students who cannot attend classes must submit a leave application stating the dates
+and a reason. Medical leave longer than 2 days requires a supporting document
+reference. Leave applications are reviewed by the programme office within 3 working
+days. A leave reference number is issued on submission.
+
+[Library]
+The main library is in the Block C, levels 2 to 4. Loan period for most books
+is 21 days, renewable twice unless reserved by another reader. Group study rooms in
+the library are bookable resources.
+
+[Contacts]
+Campus Services helpdesk: campuscentral@taylors.edu.my, ext. 1200.
+Programme Office: progoffice@taylors.edu.my, ext. 1400.

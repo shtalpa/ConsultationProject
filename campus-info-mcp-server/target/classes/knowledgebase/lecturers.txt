@@ -1,0 +1,12 @@
+:= LECTURER CONSULTATION HOURS =:
+# Format: LECTURER | DEPARTMENT | DAY | SLOTS (comma-separated 20-min start times)
+
+Dr Steve Teoh		| Computer Science  | Monday | 13:00, 13:20, 13:40
+Dr Steve Teoh		| Computer Science  | Tuesday | 13:00, 13:20, 13:40 
+Dr Sohaib Ahmed		| Computer Science  | Monday | 13:00, 13:20, 13:40
+Dr Sohaib Ahmed		| Computer Science  | Tuesday | 13:00, 13:20, 13:40 
+Dr Nur Fatin Liyana	| Computer Science  | Monday | 13:00, 13:20, 13:40
+Dr Nur Fatin Liyana	| Computer Science  | Tuesday | 13:00, 13:20, 13:40 
+Dr Osama Rehman		| Computer Science  | Monday | 13:00, 13:20, 13:40
+Dr Osama Rehman		| Computer Science  | Tuesday | 13:00, 13:20, 13:40 
+
