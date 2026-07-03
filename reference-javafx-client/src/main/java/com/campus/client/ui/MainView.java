@@ -1,5 +1,7 @@
 package com.campus.client.ui;
-
+import java.time.LocalDate;
+import java.time.LocalTime;
+import javafx.scene.control.DateCell;
 import com.campus.client.mcp.CampusMcpClient;
 import com.campus.client.rag.RagService;
 import javafx.application.Platform;
@@ -9,11 +11,12 @@ import javafx.scene.control.*;
 import javafx.scene.layout.*;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
-
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
 /**
  * A professional conversational user interface structured for the Student Workspace role.
  * Organizes operations into a horizontal top tab layout to isolate distinct tasks,
@@ -27,9 +30,14 @@ public final class MainView {
     // Top Navigation Tabs
     private final Button navDiscoveryButton = new Button("System Capabilities");
     private final Button navChatButton = new Button("AI Assistant");
+    private final Button navAvailabilityButton = new Button("Room Availability");
+    private final Button navBookingButton = new Button("Book Resource");
 
+    //page variable
     private VBox chatPageView;
     private VBox discoveryPageView;
+    private VBox availabilityPageView;
+    private VBox bookingPageView;
 
     // RAG Chat Panel Layout Elements
     private final ScrollPane chatScrollPane = new ScrollPane();
@@ -38,6 +46,25 @@ public final class MainView {
     private final Button askButton = new Button("Send ➔");
 
     private final TextArea discoveryArea = new TextArea();
+
+    // ===== ROOM AVAILABILITY CONTROLS =====
+    private final DatePicker availabilityDatePicker = new DatePicker();
+    private final TextField buildingField = new TextField();
+    private final Button checkAvailabilityButton = new Button("Check Availability");
+    private final TextArea availabilityResultArea = new TextArea();
+
+
+
+
+    // ===== BOOK RESOURCE CONTROLS =====
+    private final TextField resourceIdField = new TextField();
+    private final DatePicker bookingDatePicker = new DatePicker();
+    private final Spinner<String> startTimeField = new Spinner<>();
+    private final Spinner<String> endTimeField = new Spinner<>();
+    private final TextField studentIdField = new TextField();
+
+    private final Button bookButton = new Button("Book Resource");
+    private final TextArea bookingResultArea = new TextArea();
 
     private final ExecutorService worker = Executors.newSingleThreadExecutor(r -> {
         Thread t = new Thread(r, "ui-worker");
@@ -56,6 +83,31 @@ public final class MainView {
     private static final String CHAT_BG_AI = "#F7FAFC";
 
     public MainView() {
+
+        bookingDatePicker.setDayCellFactory(picker ->
+                new DateCell() {
+                    @Override
+                    public void updateItem(LocalDate date, boolean empty) {
+                        super.updateItem(date, empty);
+
+                        if (date.isBefore(LocalDate.now())) {
+                            setDisable(true);
+                        }
+                    }
+                });
+
+        availabilityDatePicker.setDayCellFactory(picker ->
+                new DateCell() {
+                    @Override
+                    public void updateItem(LocalDate date, boolean empty) {
+                        super.updateItem(date, empty);
+
+                        if (date.isBefore(LocalDate.now())) {
+                            setDisable(true);
+                        }
+                    }
+                });
+
         // --- 1. TOP HEADER PANEL (BRANDING + TABS) ---
         VBox topContainer = new VBox(0);
 
@@ -82,7 +134,14 @@ public final class MainView {
 
         styleTabButton(navDiscoveryButton);
         styleTabButton(navChatButton);
-        topTabBar.getChildren().addAll(navDiscoveryButton, navChatButton);
+        styleTabButton(navAvailabilityButton);
+        styleTabButton(navBookingButton);
+        topTabBar.getChildren().addAll(
+                navDiscoveryButton,
+                navChatButton,
+                navAvailabilityButton,
+                navBookingButton
+        );
 
         topContainer.getChildren().addAll(headerBanner, topTabBar);
         root.setTop(topContainer);
@@ -90,14 +149,22 @@ public final class MainView {
         // --- 2. PAGE VIEW VIEWS STACK INITIALIZATION ---
         initDiscoveryPage();
         initChatPage();
+        initAvailabilityPage();
+        initBookingPage();
 
         // Central Display Stack Panel
         StackPane contentStack = new StackPane();
-        contentStack.getChildren().addAll(discoveryPageView, chatPageView);
+        contentStack.getChildren().addAll(
+                discoveryPageView,
+                chatPageView,
+                availabilityPageView,
+                bookingPageView
+        );
         root.setCenter(contentStack);
 
         // Displays capabilities view first by default
         showPage(discoveryPageView, navDiscoveryButton);
+
 
         // --- 3. PERSISTENT SYSTEM STATUS FOOTER ---
         HBox footerBar = new HBox();
@@ -196,25 +263,108 @@ public final class MainView {
         chatPageView.setStyle("-fx-background-color: #FFFFFF;");
     }
 
+    private void initAvailabilityPage() {
+
+        styleInputField(buildingField, "Building (Optional)");
+        styleActionButton(checkAvailabilityButton, BRAND_PRIMARY);
+        styleOutputTextArea(availabilityResultArea);
+
+        HBox row1 = new HBox(10,
+                new Label("Date"),
+                availabilityDatePicker);
+
+        HBox row2 = new HBox(10,
+                new Label("Building"),
+                buildingField);
+
+        availabilityPageView = new VBox(
+                12,
+                createSectionHeaderLabel("Room Availability"),
+                row1,
+                row2,
+                checkAvailabilityButton,
+                availabilityResultArea
+        );
+
+        availabilityPageView.setPadding(new Insets(24));
+        VBox.setVgrow(availabilityResultArea, Priority.ALWAYS);
+    }
+    private void initBookingPage() {
+
+        styleInputField(resourceIdField, "Resource ID");
+        ObservableList<String> times = FXCollections.observableArrayList();
+
+        for (int h = 8; h <= 22; h++) {
+            for (int m = 0; m < 60; m += 30) {
+                times.add(String.format("%02d:%02d", h, m));
+            }
+        }
+
+        startTimeField.setEditable(true);
+        endTimeField.setEditable(true);
+
+        startTimeField.setValueFactory(
+                new SpinnerValueFactory.ListSpinnerValueFactory<>(times)
+        );
+
+        endTimeField.setValueFactory(
+                new SpinnerValueFactory.ListSpinnerValueFactory<>(times)
+        );
+        styleInputField(studentIdField, "Student ID");
+
+        styleActionButton(bookButton, BRAND_PRIMARY);
+        styleOutputTextArea(bookingResultArea);
+
+        bookingPageView = new VBox(
+                12,
+                createSectionHeaderLabel("Book Resource"),
+
+                new Label("Resource ID"),
+                resourceIdField,
+
+                new Label("Date"),
+                bookingDatePicker,
+
+                new Label("Start Time"),
+                startTimeField,
+
+                new Label("End Time"),
+                endTimeField,
+
+                new Label("Student ID"),
+                studentIdField,
+
+                bookButton,
+                bookingResultArea
+        );
+
+        bookingPageView.setPadding(new Insets(24));
+
+        VBox.setVgrow(bookingResultArea, Priority.ALWAYS);
+    }
+
     private void showPage(VBox activePage, Button activeNavButton) {
         discoveryPageView.setVisible(false);
         chatPageView.setVisible(false);
-
+        availabilityPageView.setVisible(false);
+        bookingPageView.setVisible(false);
         activePage.setVisible(true);
 
         String inactiveStyle = "-fx-background-color: #2D3748; -fx-text-fill: #A0AEC0; -fx-background-radius: 4px 4px 0px 0px;";
         navDiscoveryButton.setStyle(inactiveStyle);
         navChatButton.setStyle(inactiveStyle);
+        navAvailabilityButton.setStyle(inactiveStyle);
+        navBookingButton.setStyle(inactiveStyle);
 
         activeNavButton.setStyle("-fx-background-color: #FFFFFF; -fx-text-fill: " + BRAND_PRIMARY + "; -fx-background-radius: 4px 4px 0px 0px;");
     }
 
     // ---- Style Component Factories ------------------------------------------------------
-
     private void styleTabButton(Button btn) {
         btn.setFont(Font.font(FONT_FAMILY, FontWeight.BOLD, 13));
         btn.setPadding(new Insets(10, 20, 10, 20));
         btn.setCursor(javafx.scene.Cursor.HAND);
+        btn.setPrefWidth(145); // all tabs same width
     }
 
     private Label createSectionHeaderLabel(String text) {
@@ -275,6 +425,8 @@ public final class MainView {
     private void wire() {
         navDiscoveryButton.setOnAction(_ -> showPage(discoveryPageView, navDiscoveryButton));
         navChatButton.setOnAction(_ -> showPage(chatPageView, navChatButton));
+        navAvailabilityButton.setOnAction(_ -> showPage(availabilityPageView, navAvailabilityButton));
+        navBookingButton.setOnAction(_ -> showPage(bookingPageView, navBookingButton));
 
         questionField.setOnAction(_ -> askButton.fire());
 
@@ -302,6 +454,139 @@ public final class MainView {
                         setEnabled(true);
                         setStatus("Ready");
                     });
+                }
+            });
+        });
+
+        checkAvailabilityButton.setOnAction(_ -> {
+
+            if (mcp == null) return;
+
+            worker.submit(() -> {
+
+                try {
+
+                    if (availabilityDatePicker.getValue().isBefore(LocalDate.now())) {
+
+                        Platform.runLater(() -> {
+                            Alert alert = new Alert(Alert.AlertType.ERROR);
+                            alert.setTitle("Invalid Date");
+                            alert.setHeaderText("Past Date Selected");
+                            alert.setContentText(
+                                    "You cannot check availability for a past date."
+                            );
+                            alert.showAndWait();
+                        });
+
+                        return;
+                    }
+                    String result = mcp.checkRoomAvailability(
+                            availabilityDatePicker.getValue().toString(),
+                            buildingField.getText()
+                    );
+
+                    Platform.runLater(() ->
+                            availabilityResultArea.setText(result)
+                    );
+
+                } catch (Exception ex) {
+
+                    Platform.runLater(() ->
+                            availabilityResultArea.setText(ex.getMessage())
+                    );
+                }
+            });
+        });
+
+        bookButton.setOnAction(_ -> {
+
+            if (mcp == null) return;
+
+            worker.submit(() -> {
+
+                try {
+                    LocalDate selectedDate = bookingDatePicker.getValue();
+
+                    if (selectedDate == null) {
+                        Platform.runLater(() -> {
+                            Alert alert = new Alert(Alert.AlertType.ERROR);
+                            alert.setTitle("Invalid Date");
+                            alert.setHeaderText("No date selected");
+                            alert.setContentText("Please select a booking date.");
+                            alert.showAndWait();
+                        });
+                        return;
+                    }
+                    LocalTime startTime = LocalTime.parse(startTimeField.getValue());
+                    LocalTime endTime = LocalTime.parse(endTimeField.getValue());
+
+                    if (bookingDatePicker.getValue().isBefore(LocalDate.now())) {
+
+                        Platform.runLater(() -> {
+                            Alert alert = new Alert(Alert.AlertType.ERROR);
+                            alert.setTitle("Invalid Date");
+                            alert.setHeaderText("Past Date Selected");
+                            alert.setContentText(
+                                    "You cannot book a date in the past."
+                            );
+                            alert.showAndWait();
+                        });
+
+                        return;
+                    }
+                    if (!endTime.isAfter(startTime)) {
+
+                        Platform.runLater(() -> {
+                            Alert alert = new Alert(Alert.AlertType.ERROR);
+                            alert.setTitle("Invalid Time");
+                            alert.setHeaderText("End Time Error");
+                            alert.setContentText(
+                                    "End time must be later than start time."
+                            );
+                            alert.showAndWait();
+                        });
+
+                        return;
+                    }
+                    String result = mcp.bookResource(
+                            resourceIdField.getText(),
+                            bookingDatePicker.getValue().toString(),
+                            startTimeField.getValue(),
+                            endTimeField.getValue(),
+                            studentIdField.getText()
+                    );
+
+                    Platform.runLater(() -> {
+
+                        bookingResultArea.setText(result);
+
+                        if (result.startsWith("ERROR:")) {
+
+                            Alert alert = new Alert(Alert.AlertType.ERROR);
+                            alert.setTitle("Booking Failed");
+                            alert.setHeaderText("Unable to create booking");
+                            alert.setContentText(result);
+
+                            alert.showAndWait();
+
+                        } else {
+
+                            Alert alert = new Alert(Alert.AlertType.INFORMATION);
+                            alert.setTitle("Booking Successful");
+                            alert.setHeaderText("Booking Created");
+                            alert.setContentText(
+                                    "Reference Number: " + result
+                            );
+
+                            alert.showAndWait();
+                        }
+                    });
+
+                } catch (Exception ex) {
+
+                    Platform.runLater(() ->
+                            bookingResultArea.setText(ex.getMessage())
+                    );
                 }
             });
         });

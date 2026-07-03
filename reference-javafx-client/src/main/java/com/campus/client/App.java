@@ -123,7 +123,7 @@ public final class App extends Application {
     private LlmClient buildLlmClient() {
         String provider = firstNonBlank(System.getProperty("llm.provider"),
                 System.getenv("LLM_PROVIDER"), DEFAULT_PROVIDER).toLowerCase(Locale.ROOT);
-        int maxTokens = 1024;
+        int maxTokens = 2000;
 
         switch (provider) {
             case "anthropic" -> {
@@ -143,7 +143,7 @@ public final class App extends Application {
             case "gemini", "google" -> {
                // String key = firstNonBlank(System.getProperty("gemini.apiKey"),
                         //System.getenv("GEMINI_API_KEY"), System.getenv("GOOGLE_API_KEY"), null);
-                String key = "AIzaSyD-WWpRBXsotnl10TkZ9egMwUxttGHUhhE";
+                String key = "";
                 if (key == null) return null;
                 String model = firstNonBlank(System.getProperty("gemini.model"), DEFAULT_GEMINI_MODEL);
                 return new GeminiClient(key, model, maxTokens);

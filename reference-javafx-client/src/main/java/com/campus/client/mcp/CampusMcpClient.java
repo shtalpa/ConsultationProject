@@ -101,6 +101,43 @@ public final class CampusMcpClient implements AutoCloseable {
                 .collect(Collectors.joining("\n"));
     }
 
+    public String checkRoomAvailability(String date, String building) {
+
+        Map<String, Object> args;
+
+        if (building == null || building.isBlank()) {
+            args = Map.of(
+                    "date", date
+            );
+        } else {
+            args = Map.of(
+                    "date", date,
+                    "building", building
+            );
+        }
+
+        return callTool("check_room_availability", args);
+    }
+
+    public String bookResource(
+            String resourceId,
+            String date,
+            String startTime,
+            String endTime,
+            String studentId) {
+
+        return callTool(
+                "book_resource",
+                Map.of(
+                        "resourceId", resourceId,
+                        "date", date,
+                        "startTime", startTime,
+                        "endTime", endTime,
+                        "studentId", studentId
+                )
+        );
+    }
+
     @Override
     public void close() {
         if (client != null) {
