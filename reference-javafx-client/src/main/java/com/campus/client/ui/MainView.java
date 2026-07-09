@@ -502,6 +502,19 @@ public final class MainView {
 
             if (mcp == null) return;
 
+            // 1. Get and trim the Student ID input string
+            String studentId = studentIdField.getText().trim();
+
+            // 2. Immediate Front-End Validation for blank input
+            if (studentId.isEmpty()) {
+                Alert alert = new Alert(Alert.AlertType.WARNING);
+                alert.setTitle("Missing Information");
+                alert.setHeaderText("Student ID Required");
+                alert.setContentText("Please enter a valid Student ID before making a reservation.");
+                alert.showAndWait();
+                return; // Early return prevents worker thread execution
+            }
+
             worker.submit(() -> {
 
                 try {
@@ -521,7 +534,6 @@ public final class MainView {
                     LocalTime endTime = LocalTime.parse(endTimeField.getValue());
 
                     if (bookingDatePicker.getValue().isBefore(LocalDate.now())) {
-
                         Platform.runLater(() -> {
                             Alert alert = new Alert(Alert.AlertType.ERROR);
                             alert.setTitle("Invalid Date");
@@ -531,9 +543,9 @@ public final class MainView {
                             );
                             alert.showAndWait();
                         });
-
                         return;
                     }
+
                     if (!endTime.isAfter(startTime)) {
 
                         Platform.runLater(() -> {
@@ -545,15 +557,16 @@ public final class MainView {
                             );
                             alert.showAndWait();
                         });
-
                         return;
                     }
+
+                    // Use the safely extracted studentId string
                     String result = mcp.bookResource(
                             resourceIdField.getText(),
                             bookingDatePicker.getValue().toString(),
                             startTimeField.getValue(),
                             endTimeField.getValue(),
-                            studentIdField.getText()
+                            studentId
                     );
 
                     Platform.runLater(() -> {
@@ -566,7 +579,6 @@ public final class MainView {
                             alert.setTitle("Booking Failed");
                             alert.setHeaderText("Unable to create booking");
                             alert.setContentText(result);
-
                             alert.showAndWait();
 
                         } else {
@@ -574,16 +586,12 @@ public final class MainView {
                             Alert alert = new Alert(Alert.AlertType.INFORMATION);
                             alert.setTitle("Booking Successful");
                             alert.setHeaderText("Booking Created");
-                            alert.setContentText(
-                                    "Reference Number: " + result
-                            );
-
+                            alert.setContentText("Reference Number: " + result);
                             alert.showAndWait();
                         }
                     });
 
                 } catch (Exception ex) {
-
                     Platform.runLater(() ->
                             bookingResultArea.setText(ex.getMessage())
                     );
