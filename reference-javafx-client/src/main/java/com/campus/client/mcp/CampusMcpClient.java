@@ -19,12 +19,18 @@ import org.slf4j.LoggerFactory;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.time.Duration;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-
+/**
+ * Wraps the MCP {@link McpSyncClient} for the Campus server. It connects over the HTTP/SSE
+ * transport and exposes simple methods for discovery (tools, resources, prompts) and invocation.
+ *
+ * <p>This is the class students study most closely: it shows the full MCP client lifecycle &mdash;
+ * build a transport, build a client, {@code initialize()} (the JSON-RPC handshake), then list and
+ * call capabilities.</p>
+ */
 public final class CampusMcpClient implements AutoCloseable {
 
     private static final Logger log = LoggerFactory.getLogger(CampusMcpClient.class);
@@ -36,8 +42,10 @@ public final class CampusMcpClient implements AutoCloseable {
         this.baseUrl = baseUrl;
     }
 
+    /** Opens the SSE stream and performs the MCP initialize handshake. */
     public McpSchema.InitializeResult connect() {
-
+        // The SSE transport only needs the base URL; it discovers the message endpoint from the
+        // server's first "endpoint" SSE event. Current SDK versions require the builder.
         HttpClientSseClientTransport transport = HttpClientSseClientTransport.builder(baseUrl)
                 .jsonMapper(new JacksonMcpJsonMapper(JsonMapper.builder().build()))
                 .sseEndpoint("/sse")
@@ -65,6 +73,7 @@ public final class CampusMcpClient implements AutoCloseable {
         return client.listPrompts().prompts();
     }
 
+    /** Calls a tool and flattens its text content into one string. */
     public String callTool(String name, Map<String, Object> arguments) {
         log.info("callTool {} {}", name, arguments);
         CallToolResult result = client.callTool(new CallToolRequest(name, arguments));
@@ -75,6 +84,7 @@ public final class CampusMcpClient implements AutoCloseable {
         return Boolean.TRUE.equals(result.isError()) ? "ERROR: " + text : text;
     }
 
+    /** Reads a resource and returns its concatenated text contents. */
     public String readResource(String uri) {
         ReadResourceResult result = client.readResource(new ReadResourceRequest(uri));
         return result.contents().stream()
@@ -83,7 +93,7 @@ public final class CampusMcpClient implements AutoCloseable {
                 .collect(Collectors.joining("\n"));
     }
 
-   
+    /** Fetches a server-defined prompt template, returning its rendered text. */
     public String getPrompt(String name, Map<String, Object> arguments) {
         GetPromptResult result = client.getPrompt(new GetPromptRequest(name, arguments));
         return result.messages().stream()
@@ -92,23 +102,18 @@ public final class CampusMcpClient implements AutoCloseable {
     }
 
     public String checkRoomAvailability(String date, String building) {
-        return checkRoomAvailability(date, building, null, null);
-    }
 
-  
-    public String checkRoomAvailability(String date, String building,
-                                        String startTime, String endTime) {
+        Map<String, Object> args;
 
-        Map<String, Object> args = new HashMap<>();
-        args.put("date", date);
-
-        if (building != null && !building.isBlank()) {
-            args.put("building", building);
-        }
-        if (startTime != null && !startTime.isBlank()
-                && endTime != null && !endTime.isBlank()) {
-            args.put("startTime", startTime);
-            args.put("endTime", endTime);
+        if (building == null || building.isBlank()) {
+            args = Map.of(
+                    "date", date
+            );
+        } else {
+            args = Map.of(
+                    "date", date,
+                    "building", building
+            );
         }
 
         return callTool("check_room_availability", args);
@@ -141,4 +146,3 @@ public final class CampusMcpClient implements AutoCloseable {
         }
     }
 }
-
