@@ -19,11 +19,6 @@ import java.util.stream.Collectors;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 
-/**
- * A professional conversational user interface structured for the Student Workspace role.
- * Organizes operations into a horizontal top tab layout to isolate distinct tasks,
- * launching with the System Capabilities view by default.
- */
 public final class MainView {
 
     private final BorderPane root = new BorderPane();
@@ -54,6 +49,8 @@ public final class MainView {
     // ===== ROOM AVAILABILITY CONTROLS =====
     private final DatePicker availabilityDatePicker = new DatePicker();
     private final TextField buildingField = new TextField();
+    private final Spinner<String> availStartTime = new Spinner<>();
+    private final Spinner<String> availEndTime = new Spinner<>();
     private final Button checkAvailabilityButton = new Button("Check Availability");
     private final TextArea availabilityResultArea = new TextArea();
 
@@ -277,12 +274,28 @@ public final class MainView {
         styleActionButton(checkAvailabilityButton, BRAND_PRIMARY);
         styleOutputTextArea(availabilityResultArea);
 
+        // Time list with an "Any" sentinel first: choosing Any (either field) = full-day view.
+        ObservableList<String> availTimes = FXCollections.observableArrayList();
+        availTimes.add("Any");
+        for (int h = 8; h <= 22; h++) {
+            for (int m = 0; m < 60; m += 30) {
+                availTimes.add(String.format("%02d:%02d", h, m));
+            }
+        }
+        availStartTime.setEditable(true);
+        availEndTime.setEditable(true);
+        availStartTime.setValueFactory(new SpinnerValueFactory.ListSpinnerValueFactory<>(availTimes));
+        availEndTime.setValueFactory(new SpinnerValueFactory.ListSpinnerValueFactory<>(availTimes));
+
         HBox row1 = new HBox(10, new Label("Date"), availabilityDatePicker);
         HBox row2 = new HBox(10, new Label("Building"), buildingField);
+        HBox row3 = new HBox(10,
+                new Label("Start Time"), availStartTime,
+                new Label("End Time"), availEndTime);
 
         availabilityPageView = new VBox(12,
                 createSectionHeaderLabel("Room Availability"),
-                row1, row2, checkAvailabilityButton, availabilityResultArea
+                row1, row2, row3, checkAvailabilityButton, availabilityResultArea
         );
         availabilityPageView.setPadding(new Insets(24));
         VBox.setVgrow(availabilityResultArea, Priority.ALWAYS);
@@ -445,7 +458,20 @@ public final class MainView {
 
             worker.submit(() -> {
                 try {
-                    if (availabilityDatePicker.getValue().isBefore(LocalDate.now())) {
+                    LocalDate selectedDate = availabilityDatePicker.getValue();
+
+                    if (selectedDate == null) {
+                        Platform.runLater(() -> {
+                            Alert alert = new Alert(Alert.AlertType.ERROR);
+                            alert.setTitle("Invalid Date");
+                            alert.setHeaderText("No date selected");
+                            alert.setContentText("Please select a date to check availability.");
+                            alert.showAndWait();
+                        });
+                        return;
+                    }
+
+                    if (selectedDate.isBefore(LocalDate.now())) {
                         Platform.runLater(() -> {
                             Alert alert = new Alert(Alert.AlertType.ERROR);
                             alert.setTitle("Invalid Date");
@@ -455,13 +481,34 @@ public final class MainView {
                         });
                         return;
                     }
+
+                    // Optional time window: only used when neither field is "Any".
+                    String start = availStartTime.getValue();
+                    String end = availEndTime.getValue();
+                    boolean useTime = start != null && end != null
+                            && !"Any".equals(start) && !"Any".equals(end);
+
+                    if (useTime && !LocalTime.parse(end).isAfter(LocalTime.parse(start))) {
+                        Platform.runLater(() -> {
+                            Alert alert = new Alert(Alert.AlertType.ERROR);
+                            alert.setTitle("Invalid Time");
+                            alert.setHeaderText("End Time Error");
+                            alert.setContentText("End time must be later than start time.");
+                            alert.showAndWait();
+                        });
+                        return;
+                    }
+
                     String result = mcp.checkRoomAvailability(
-                            availabilityDatePicker.getValue().toString(),
-                            buildingField.getText()
+                            selectedDate.toString(),
+                            buildingField.getText(),
+                            useTime ? start : null,
+                            useTime ? end : null
                     );
                     Platform.runLater(() -> availabilityResultArea.setText(result));
                 } catch (Exception ex) {
-                    Platform.runLater(() -> availabilityResultArea.setText(ex.getMessage()));
+                    Platform.runLater(() -> availabilityResultArea.setText(
+                            "Could not check availability: " + ex.getMessage()));
                 }
             });
         });
