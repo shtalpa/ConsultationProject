@@ -15,11 +15,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-/**
- * Builds the campus {@code Tools} exposed to MCP clients. Tools are actions the LLM can choose
- * to invoke: searching the knowledge base (RAG retrieval), checking availability, making a
- * booking, listing lecturer slots, and submitting a leave application.
- */
 public final class CampusTools {
 
     private final KnowledgeBase kb;
@@ -123,7 +118,7 @@ public final class CampusTools {
 
                     List<String[]> rooms = parseRooms();
 
-                    // Keep the full booking rows (with their time windows) for this date.
+                 
                     List<String[]> dayBookings = dataStore.bookingsOn(date).stream()
                             .map(line -> line.split("\\s*\\|\\s*"))
                             .filter(p -> p.length >= 2)
@@ -273,13 +268,6 @@ public final class CampusTools {
                 .build();
     }
 
-    // ---- helpers ----------------------------------------------------------
-
-    /**
-     * True if a booking row's time window overlaps the requested [reqStart, reqEnd) window.
-     * Bookings with blank or unparseable times are treated as all-day (always conflict), so a
-     * timeless booking still blocks the room.
-     */
     private static boolean overlaps(String[] booking, LocalTime reqStart, LocalTime reqEnd) {
         if (booking.length < 5 || booking[3].isBlank() || booking[4].isBlank()) {
             return true; // no time recorded -> treat as occupying the whole day
@@ -294,7 +282,6 @@ public final class CampusTools {
         }
     }
 
-    /** Parses the room table from facilities.txt into [id, type, capacity, building] rows. */
     private List<String[]> parseRooms() {
         List<String[]> rooms = new ArrayList<>();
         for (String line : kb.rawDocument("facilities.txt").split("\\r?\\n")) {
