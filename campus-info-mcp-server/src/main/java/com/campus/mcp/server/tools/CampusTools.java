@@ -8,6 +8,7 @@ import io.modelcontextprotocol.spec.McpSchema.CallToolResult;
 import io.modelcontextprotocol.spec.McpSchema.TextContent;
 import io.modelcontextprotocol.spec.McpSchema.Tool;
 
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -83,8 +84,10 @@ public final class CampusTools {
             {
               "type": "object",
               "properties": {
-                "date":     { "type": "string", "description": "Date in yyyy-MM-dd" },
-                "building": { "type": "string", "description": "Optional building code, e.g. D, E, LIB, OUT" }
+                "date":      { "type": "string", "description": "Date in yyyy-MM-dd" },
+                "building":  { "type": "string", "description": "Optional building code, e.g. D, E, LIB, OUT" },
+                "startTime": { "type": "string", "description": "Optional start time HH:mm. With endTime, a room counts as booked only if an existing booking overlaps this window." },
+                "endTime":   { "type": "string", "description": "Optional end time HH:mm." }
               },
               "required": ["date"]
             }
@@ -99,22 +102,57 @@ public final class CampusTools {
                     Map<String, Object> a = request.arguments();
                     String date = str(a, "date");
                     String building = str(a, "building");
+                    String startTime = str(a, "startTime");
+                    String endTime = str(a, "endTime");
+
+                    // Time filtering only applies when BOTH times are supplied and valid.
+                    boolean timeFilter = !startTime.isBlank() && !endTime.isBlank();
+                    LocalTime reqStart = null;
+                    LocalTime reqEnd = null;
+                    if (timeFilter) {
+                        try {
+                            reqStart = LocalTime.parse(startTime.strip());
+                            reqEnd = LocalTime.parse(endTime.strip());
+                        } catch (Exception e) {
+                            return error("Invalid time format. Use HH:mm for startTime and endTime.");
+                        }
+                        if (!reqEnd.isAfter(reqStart)) {
+                            return error("endTime must be later than startTime.");
+                        }
+                    }
+
                     List<String[]> rooms = parseRooms();
-                    List<String> booked = dataStore.bookingsOn(date).stream()
+
+                    // Keep the full booking rows (with their time windows) for this date.
+                    List<String[]> dayBookings = dataStore.bookingsOn(date).stream()
                             .map(line -> line.split("\\s*\\|\\s*"))
                             .filter(p -> p.length >= 2)
-                            .map(p -> p[1])
                             .collect(Collectors.toList());
 
-                    StringBuilder sb = new StringBuilder("Availability on " + date + ":\n");
+                    StringBuilder sb = new StringBuilder(timeFilter
+                            ? "Availability on " + date + " (" + startTime + "-" + endTime + "):\n"
+                            : "Availability on " + date + ":\n");
+
                     for (String[] r : rooms) {
                         String id = r[0], type = r[1], cap = r[2], bldg = r[3];
                         if (!building.isBlank() && !bldg.equalsIgnoreCase(building)) {
                             continue;
                         }
-                        boolean isBooked = booked.contains(id);
+
+                        boolean isBooked;
+                        if (!timeFilter) {
+                            // Per-day view (original behaviour): booked if any booking exists.
+                            isBooked = dayBookings.stream().anyMatch(p -> p[1].equalsIgnoreCase(id));
+                        } else {
+                            // Time-aware: booked only if a booking overlaps the requested window.
+                            final LocalTime rs = reqStart, re = reqEnd;
+                            isBooked = dayBookings.stream()
+                                    .filter(p -> p[1].equalsIgnoreCase(id))
+                                    .anyMatch(p -> overlaps(p, rs, re));
+                        }
+
                         sb.append(String.format("  %-7s %-16s cap %-3s %s  -> %s%n",
-                                id, type, cap, bldg, isBooked ? "HAS BOOKING(S)" : "free"));
+                                id, type, cap, bldg, isBooked ? "BOOKED" : "free"));
                     }
                     return text(sb.toString());
                 })
@@ -236,6 +274,25 @@ public final class CampusTools {
     }
 
     // ---- helpers ----------------------------------------------------------
+
+    /**
+     * True if a booking row's time window overlaps the requested [reqStart, reqEnd) window.
+     * Bookings with blank or unparseable times are treated as all-day (always conflict), so a
+     * timeless booking still blocks the room.
+     */
+    private static boolean overlaps(String[] booking, LocalTime reqStart, LocalTime reqEnd) {
+        if (booking.length < 5 || booking[3].isBlank() || booking[4].isBlank()) {
+            return true; // no time recorded -> treat as occupying the whole day
+        }
+        try {
+            LocalTime bStart = LocalTime.parse(booking[3].strip());
+            LocalTime bEnd = LocalTime.parse(booking[4].strip());
+            // Half-open overlap: two windows overlap iff each starts before the other ends.
+            return bStart.isBefore(reqEnd) && reqStart.isBefore(bEnd);
+        } catch (Exception e) {
+            return true; // unparseable time -> be conservative and count it as booked
+        }
+    }
 
     /** Parses the room table from facilities.txt into [id, type, capacity, building] rows. */
     private List<String[]> parseRooms() {
