@@ -1,4 +1,4 @@
-packagepackage com.campus.mcp.server.tools;
+package com.campus.mcp.server.tools;
 
 import com.campus.mcp.server.kb.DataStore;
 import com.campus.mcp.server.kb.KnowledgeBase;
