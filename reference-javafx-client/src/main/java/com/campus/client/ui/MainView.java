@@ -34,15 +34,14 @@ public final class MainView {
     private final Button navChatButton = new Button("AI Assistant");
     private final Button navAvailabilityButton = new Button("Lecturer Availability");
     private final Button navBookingButton = new Button("Book Resource");
-    private final Button navProfileButton = new Button("My Profile");
+    private final Button navProfileTabViewButton = new Button("My Profile"); // Relabeled cleanly for user experience
 
-    // Page View Components (Decoupled & Inline Architectures Normalized)
+    // Page view containers
     private VBox chatPageView;
     private VBox discoveryPageView;
-    private VBox bookingPageView;
-    private VBox availabilityPageView; // Retained for fallback structural checks
     private final LecturerAvailabilityView lecturerAvailabilityView = new LecturerAvailabilityView();
-    private ProfileTabView profileTabView;
+    private VBox bookingPageView;
+    private ProfileTabView profileTabView; // Added the missing view component instance field
 
     // RAG Chat Panel Layout Elements
     private final ScrollPane chatScrollPane = new ScrollPane();
@@ -52,11 +51,9 @@ public final class MainView {
 
     private final TextArea discoveryArea = new TextArea();
 
-    // ===== LECTURER / ROOM AVAILABILITY legacy CONTROLS =====
+    // ===== ROOM AVAILABILITY CONTROLS =====
     private final DatePicker availabilityDatePicker = new DatePicker();
     private final TextField buildingField = new TextField();
-    private final Spinner<String> availStartTime = new Spinner<>();
-    private final Spinner<String> availEndTime = new Spinner<>();
     private final Button checkAvailabilityButton = new Button("Check Availability");
     private final TextArea availabilityResultArea = new TextArea();
 
@@ -70,7 +67,6 @@ public final class MainView {
     private final Button bookButton = new Button("Book Resource");
     private final TextArea bookingResultArea = new TextArea();
 
-    // Asynchronous managed background lifecycle single-thread executor execution layer
     private final ExecutorService worker = Executors.newSingleThreadExecutor(r -> {
         Thread t = new Thread(r, "ui-worker");
         t.setDaemon(true);
@@ -89,7 +85,6 @@ public final class MainView {
 
     public MainView() {
 
-        // Enforce defensive guard parameters on date node picker cells
         bookingDatePicker.setDayCellFactory(picker ->
                 new DateCell() {
                     @Override
@@ -115,6 +110,7 @@ public final class MainView {
         // --- 1. TOP HEADER PANEL (BRANDING + TABS) ---
         VBox topContainer = new VBox(0);
 
+        // Branding Banner
         HBox headerBanner = new HBox(8);
         headerBanner.setPadding(new Insets(16, 24, 12, 24));
         headerBanner.setAlignment(Pos.CENTER_LEFT);
@@ -129,6 +125,7 @@ public final class MainView {
         subHeading.setFont(Font.font(FONT_FAMILY, FontWeight.NORMAL, 12));
         headerBanner.getChildren().addAll(heading, subHeading);
 
+        // Horizontal Top Navigation Tabs Bar
         HBox topTabBar = new HBox(4);
         topTabBar.setPadding(new Insets(0, 24, 0, 24));
         topTabBar.setAlignment(Pos.BOTTOM_LEFT);
@@ -138,14 +135,14 @@ public final class MainView {
         styleTabButton(navChatButton);
         styleTabButton(navAvailabilityButton);
         styleTabButton(navBookingButton);
-        styleTabButton(navProfileButton);
+        styleTabButton(navProfileTabViewButton); // Added styling loop for profile button
 
         topTabBar.getChildren().addAll(
                 navDiscoveryButton,
                 navChatButton,
                 navAvailabilityButton,
                 navBookingButton,
-                navProfileButton
+                navProfileTabViewButton // Added button to header navigation panel layout
         );
 
         topContainer.getChildren().addAll(headerBanner, topTabBar);
@@ -154,19 +151,17 @@ public final class MainView {
         // --- 2. PAGE VIEW VIEWS STACK INITIALIZATION ---
         initDiscoveryPage();
         initChatPage();
-        initAvailabilityPage(); // Keeps inline logic synchronized for backup checks
         initBookingPage();
-        this.profileTabView = new ProfileTabView(this.worker);
+        this.profileTabView = new ProfileTabView(this.worker); // Initialized custom profile panel safely
 
-        // Central Display Stack Panel - Mount views systematically
+        // Central Display Stack Panel
         StackPane contentStack = new StackPane();
         contentStack.getChildren().addAll(
                 discoveryPageView,
                 chatPageView,
-                availabilityPageView,
-                lecturerAvailabilityView.getView(), // Standalone structural page container template
+                lecturerAvailabilityView.getView(),
                 bookingPageView,
-                profileTabView
+                profileTabView // Mounted profile pane onto view stack array hierarchy
         );
         root.setCenter(contentStack);
 
@@ -193,14 +188,10 @@ public final class MainView {
         return root;
     }
 
-    public ProfileTabView getProfileTabView() {
-        return profileTabView;
-    }
-
     public void bind(CampusMcpClient mcp, RagService rag) {
         this.mcp = mcp;
         this.rag = rag;
-        this.lecturerAvailabilityView.bind(mcp); // Complete integration step from version 3
+        lecturerAvailabilityView.bind(mcp);
         setEnabled(true);
         if (rag == null) {
             askButton.setDisable(true);
@@ -275,38 +266,6 @@ public final class MainView {
         chatPageView.setStyle("-fx-background-color: #FFFFFF;");
     }
 
-    private void initAvailabilityPage() {
-        styleInputField(buildingField, "Building (Optional)");
-        styleActionButton(checkAvailabilityButton, BRAND_PRIMARY);
-        styleOutputTextArea(availabilityResultArea);
-
-        // Incorporates full time choices plus an "Any" sentinel tracking block from Version 2
-        ObservableList<String> availTimes = FXCollections.observableArrayList();
-        availTimes.add("Any");
-        for (int h = 8; h <= 22; h++) {
-            for (int m = 0; m < 60; m += 30) {
-                availTimes.add(String.format("%02d:%02d", h, m));
-            }
-        }
-        availStartTime.setEditable(true);
-        availEndTime.setEditable(true);
-        availStartTime.setValueFactory(new SpinnerValueFactory.ListSpinnerValueFactory<>(availTimes));
-        availEndTime.setValueFactory(new SpinnerValueFactory.ListSpinnerValueFactory<>(availTimes));
-
-        HBox row1 = new HBox(10, new Label("Date"), availabilityDatePicker);
-        HBox row2 = new HBox(10, new Label("Building"), buildingField);
-        HBox row3 = new HBox(10,
-                new Label("Start Time"), availStartTime,
-                new Label("End Time"), availEndTime);
-
-        availabilityPageView = new VBox(12,
-                createSectionHeaderLabel("Backup Room Availability"),
-                row1, row2, row3, checkAvailabilityButton, availabilityResultArea
-        );
-        availabilityPageView.setPadding(new Insets(24));
-        VBox.setVgrow(availabilityResultArea, Priority.ALWAYS);
-    }
-
     private void initBookingPage() {
         styleInputField(resourceIdField, "Resource ID");
         ObservableList<String> times = FXCollections.observableArrayList();
@@ -340,14 +299,16 @@ public final class MainView {
         VBox.setVgrow(bookingResultArea, Priority.ALWAYS);
     }
 
-    private void showPage(Pane activePage, Button activeNavButton) {
+    /**
+     * Parameter set to generic Node type to handle distinct page view structures safely.
+     */
+    private void showPage(javafx.scene.Node activePage, Button activeNavButton) {
         discoveryPageView.setVisible(false);
         chatPageView.setVisible(false);
-        availabilityPageView.setVisible(false);
         lecturerAvailabilityView.getView().setVisible(false);
         bookingPageView.setVisible(false);
         if (profileTabView != null) {
-            profileTabView.setVisible(false);
+            profileTabView.setVisible(false); // Clean reset layout state layer visibility logic
         }
         activePage.setVisible(true);
 
@@ -356,7 +317,7 @@ public final class MainView {
         navChatButton.setStyle(inactiveStyle);
         navAvailabilityButton.setStyle(inactiveStyle);
         navBookingButton.setStyle(inactiveStyle);
-        navProfileButton.setStyle(inactiveStyle);
+        navProfileTabViewButton.setStyle(inactiveStyle); // Reset background layout profile style
 
         activeNavButton.setStyle("-fx-background-color: #FFFFFF; -fx-text-fill: " + BRAND_PRIMARY + "; -fx-background-radius: 4px 4px 0px 0px;");
     }
@@ -366,7 +327,7 @@ public final class MainView {
         btn.setFont(Font.font(FONT_FAMILY, FontWeight.BOLD, 13));
         btn.setPadding(new Insets(10, 20, 10, 20));
         btn.setCursor(javafx.scene.Cursor.HAND);
-        btn.setPrefWidth(145);
+        btn.setPrefWidth(145); // all tabs same width
     }
 
     private Label createSectionHeaderLabel(String text) {
@@ -378,7 +339,7 @@ public final class MainView {
 
     private void styleInputField(TextField field, String placeholder) {
         field.setPromptText(placeholder);
-        field.setFont(Font.font(FONT_FAMILY, 13)); 
+        field.setFont(Font.font(FONT_FAMILY, 13));
         field.setPadding(new Insets(10));
         field.setPrefWidth(320);
         field.setStyle("-fx-background-color: #F8FAFC; -fx-border-color: #CBD5E0; -fx-border-radius: 4px; -fx-background-radius: 4px;");
@@ -422,15 +383,14 @@ public final class MainView {
         });
     }
 
-    // ---- Functional Asynchronous Event Wiring Actions ------------------------------------------------
+    // ---- Functional Event Mapping Actions ------------------------------------------------
 
     private void wire() {
         navDiscoveryButton.setOnAction(_ -> showPage(discoveryPageView, navDiscoveryButton));
         navChatButton.setOnAction(_ -> showPage(chatPageView, navChatButton));
-        // Routes navigation directly to the decoupled encapsulated lecturer canvas pane
         navAvailabilityButton.setOnAction(_ -> showPage(lecturerAvailabilityView.getView(), navAvailabilityButton));
         navBookingButton.setOnAction(_ -> showPage(bookingPageView, navBookingButton));
-        navProfileButton.setOnAction(_ -> showPage(profileTabView, navProfileButton));
+        navProfileTabViewButton.setOnAction(_ -> showPage(profileTabView, navProfileTabViewButton)); // Wired profile event toggle visibility switch
 
         questionField.setOnAction(_ -> askButton.fire());
 
@@ -462,63 +422,6 @@ public final class MainView {
             });
         });
 
-        // Retained for validation parity checks on full time slot specifications
-        checkAvailabilityButton.setOnAction(_ -> {
-            if (mcp == null) return;
-
-            worker.submit(() -> {
-                try {
-                    LocalDate selectedDate = availabilityDatePicker.getValue();
-                    if (selectedDate == null) {
-                        Platform.runLater(() -> {
-                            Alert alert = new Alert(Alert.AlertType.ERROR);
-                            alert.setTitle("Invalid Date");
-                            alert.setHeaderText("No date selected");
-                            alert.setContentText("Please select a date to check availability.");
-                            alert.showAndWait();
-                        });
-                        return;
-                    }
-
-                    if (selectedDate.isBefore(LocalDate.now())) {
-                        Platform.runLater(() -> {
-                            Alert alert = new Alert(Alert.AlertType.ERROR);
-                            alert.setTitle("Invalid Date");
-                            alert.setHeaderText("Past Date Selected");
-                            alert.setContentText("You cannot check availability for a past date.");
-                            alert.showAndWait();
-                        });
-                        return;
-                    }
-
-                    String start = availStartTime.getValue();
-                    String end = availEndTime.getValue();
-                    boolean useTime = start != null && end != null && !"Any".equals(start) && !"Any".equals(end);
-
-                    if (useTime && !LocalTime.parse(end).isAfter(LocalTime.parse(start))) {
-                        Platform.runLater(() -> {
-                            Alert alert = new Alert(Alert.AlertType.ERROR);
-                            alert.setTitle("Invalid Time");
-                            alert.setHeaderText("End Time Error");
-                            alert.setContentText("End time must be later than start time.");
-                            alert.showAndWait();
-                        });
-                        return;
-                    }
-
-                    String result = mcp.checkRoomAvailability(
-                            selectedDate.toString(),
-                            buildingField.getText(),
-                            useTime ? start : null,
-                            useTime ? end : null
-                    );
-                    Platform.runLater(() -> availabilityResultArea.setText(result));
-                } catch (Exception ex) {
-                    Platform.runLater(() -> availabilityResultArea.setText("Could not check availability: " + ex.getMessage()));
-                }
-            });
-        });
-
         bookButton.setOnAction(_ -> {
             if (mcp == null) return;
 
@@ -538,7 +441,7 @@ public final class MainView {
                     LocalTime startTime = LocalTime.parse(startTimeField.getValue());
                     LocalTime endTime = LocalTime.parse(endTimeField.getValue());
 
-                    if (selectedDate.isBefore(LocalDate.now())) {
+                    if (bookingDatePicker.getValue().isBefore(LocalDate.now())) {
                         Platform.runLater(() -> {
                             Alert alert = new Alert(Alert.AlertType.ERROR);
                             alert.setTitle("Invalid Date");
@@ -560,7 +463,7 @@ public final class MainView {
                     }
                     String result = mcp.bookResource(
                             resourceIdField.getText(),
-                            selectedDate.toString(),
+                            bookingDatePicker.getValue().toString(),
                             startTimeField.getValue(),
                             endTimeField.getValue(),
                             studentIdField.getText()
